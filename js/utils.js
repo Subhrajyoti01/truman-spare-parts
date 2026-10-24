@@ -1,0 +1,24 @@
+(() => {
+ const U=window.TrumanUtils={};
+ U.$=(s,r=document)=>r.querySelector(s); U.$$=(s,r=document)=>[...r.querySelectorAll(s)];
+ U.escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ U.money=v=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(v||0));
+ U.date=v=>v?new Date(v).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
+ U.datetime=v=>v?new Date(v).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'—';
+ U.toast=(message,type='')=>{const el=document.createElement('div');el.className='toast '+type;el.textContent=message;U.$('#toast-region').append(el);setTimeout(()=>el.remove(),4500);};
+ U.err=e=>e?.message||String(e||'Unexpected error');
+ U.call=async(name,args={})=>{if(!window.sb)throw new Error('Supabase is not configured. Open Settings and add your project URL and public key.');const {data,error}=await window.sb.rpc(name,args);if(error)throw error;return data;};
+ U.rows=async(table,opts={})=>{if(!window.sb)throw new Error('Supabase is not configured.');let q=window.sb.from(table).select(opts.select||'*');if(opts.order)q=q.order(opts.order,{ascending:opts.ascending??true});if(opts.limit)q=q.limit(opts.limit);if(opts.eq){for(const [k,v] of Object.entries(opts.eq))q=q.eq(k,v);}const {data,error}=await q;if(error)throw error;return data||[];};
+ U.one=async(table,id)=>{const {data,error}=await window.sb.from(table).select('*').eq('id',id).single();if(error)throw error;return data;};
+ U.csv=(name,rows)=>{if(!rows?.length){U.toast('No records to export.');return;}const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))];const val=v=>{const s=typeof v==='object'&&v!==null?JSON.stringify(v):String(v??'');return '"'+s.replace(/"/g,'""')+'"';};const csv=[cols.map(val).join(','),...rows.map(r=>cols.map(c=>val(r[c])).join(','))].join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));a.download=name;a.click();URL.revokeObjectURL(a.href);};
+ U.modal=(title,body,actions='')=>{U.$('#dialog-content').innerHTML=`<div class="dialog-inner"><div class="dialog-title"><h2>${U.escape(title)}</h2><button class="btn small" data-close-dialog>Close</button></div>${body}${actions}</div>`;const d=U.$('#app-dialog');if(!d.open)d.showModal();U.$('[data-close-dialog]').onclick=()=>d.close();};
+ U.form=(fields,values={})=>{
+  const markup=`<form id="dynamic-form" class="form-grid">${fields.map(f=>{const val=values[f.name]??f.value??'';let control='';if(f.type==='textarea'){control=`<textarea name="${f.name}" ${f.required?'required':''} placeholder="${U.escape(f.placeholder||'')}">${U.escape(val)}</textarea>`;}else if(f.type==='select'){control=`<select name="${f.name}" ${f.required?'required':''}>${(f.options||[]).map(o=>`<option value="${U.escape(o.value)}" ${String(o.value)===String(val)?'selected':''}>${U.escape(o.label)}</option>`).join('')}</select>`;}else{control=`<input name="${f.name}" type="${f.type||'text'}" value="${U.escape(val)}" ${f.min!==undefined?`min="${f.min}"`:''} ${f.step?`step="${f.step}"`:''} ${f.required?'required':''} placeholder="${U.escape(f.placeholder||'')}">`;}return `<label class="${f.span?'span-2':''}">${U.escape(f.label)}${control}</label>`;}).join('')}<div class="span-2 form-actions"><button type="button" class="btn" data-close-dialog>Cancel</button><button class="btn primary" type="submit">Save</button></div><p id="dynamic-message" class="form-message span-2"></p></form>`;
+  U.$('#dialog-content').innerHTML=`<div class="dialog-inner"><div class="dialog-title"><h2>Details</h2><button class="btn small" data-close-dialog>Close</button></div>${markup}</div>`;const d=U.$('#app-dialog');if(!d.open)d.showModal();U.$('[data-close-dialog]').onclick=()=>d.close();return U.$('#dynamic-form');
+ };
+ U.status=s=>{const cls=['Open','Approved','Received','Resolved','Closed'].includes(s)?'green':['Pending Approval','Arrived','Ordered'].includes(s)?'amber':['Rejected','Cancelled','Overdue'].includes(s)?'red':'';return `<span class="pill ${cls}">${U.escape(s||'—')}</span>`;};
+ U.reorderPoint=p=>Math.ceil(Number(p.avg_daily_demand||0)*Number(p.lead_time_days||0)+Number(p.safety_stock||0));
+ U.reorderNeeded=p=>Number(p.current_stock||0)<=U.reorderPoint(p);U.outstanding=p=>Number(p.outstanding_order_qty||0);
+ U.suggestQty=p=>{const target=Number(p.target_stock_level||0),stock=Number(p.current_stock||0),out=U.outstanding(p);let q=target>0?Math.max(0,target-stock-out):Math.max(1,2*U.reorderPoint(p)-stock-out);const moq=Number(p.minimum_order_qty||0);if(q>0&&moq>0)q=Math.max(q,moq);return Math.ceil(q);};
+ U.confirm=message=>window.confirm(message);U.loadError=e=>`<div class="panel"><div class="notice warning">${U.escape(U.err(e))}</div><p class="muted">Check your network, Supabase configuration, database schema, and user workshop membership.</p></div>`;
+})();
