@@ -78,3 +78,24 @@ grant execute on function public.close_job_card(uuid) to authenticated;
 grant execute on function public.update_job_card(uuid,text,text,text,text,text,text,text) to authenticated;
 grant execute on function public.approve_provisional_job_card(uuid,text) to authenticated;
 grant execute on function public.reject_provisional_job_card(uuid,text) to authenticated;
+
+
+-- Only the workshop administrator can reopen a rejected or closed job card.
+-- Reopened cards return to Open so they can be selected in Issue Parts.
+create or replace function public.reopen_job_card(p_job_card_id uuid)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare j public.job_cards%rowtype; w uuid;
+begin
+ w:=public.current_workshop_id();
+ if w is null or not public.has_workshop_role(array['workshop_admin']::public.workshop_role[]) then
+  raise exception 'Only the workshop administrator can reopen job cards';
+ end if;
+ select * into j from public.job_cards where id=p_job_card_id and workshop_id=w for update;
+ if not found or j.status not in ('Rejected','Closed') then
+  raise exception 'Only a rejected or closed job card can be reopened';
+ end if;
+ update public.job_cards set status='Open',rejection_reason=null,updated_at=now() where id=j.id;
+ perform public.audit_event(w,'JOB_CARD_REOPENED',j.job_number,null,jsonb_build_object('job_card_id',j.id,'previous_status',j.status));
+end $$;
+
+grant execute on function public.reopen_job_card(uuid) to authenticated;
