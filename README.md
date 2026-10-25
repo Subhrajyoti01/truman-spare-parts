@@ -60,3 +60,7 @@ ABC is staff-assigned in this version; the UI does not pretend to calculate valu
 ## Files
 
 See `DEPLOYMENT.md` for GitHub Pages instructions and `tests/` for test cases and what has/has not been executed.
+
+
+## Feature update migration
+For an existing Supabase database, run only the new `admin_delete_part` function/grant block at the end of the updated `schema.sql` in SQL Editor. Do not blindly rerun the whole original schema. Push the updated frontend files to GitHub. Camera scanning uses the browser BarcodeDetector API; support varies and camera permission is required on HTTPS. Batch barcode labels are saved in this browser only, not synced between devices.

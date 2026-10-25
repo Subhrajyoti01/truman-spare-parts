@@ -44,3 +44,44 @@ create policy parts_read on public.parts for select to authenticated using(works
 create policy jobs_read on public.job_cards for select to authenticated using(workshop_id=public.current_workshop_id());create policy orders_read on public.purchase_orders for select to authenticated using(workshop_id=public.current_workshop_id());create policy exceptions_read on public.stock_out_exceptions for select to authenticated using(workshop_id=public.current_workshop_id());create policy movements_read on public.stock_movements for select to authenticated using(workshop_id=public.current_workshop_id());create policy audit_read on public.audit_events for select to authenticated using(workshop_id=public.current_workshop_id() and public.has_workshop_role(array['workshop_admin','inventory_manager','auditor']::public.workshop_role[]));
 -- No direct INSERT/UPDATE/DELETE policies for stock movements or audit events: writes happen only inside RPCs.
 -- Staff membership administration must be performed by project owner/admin tooling; no self-promotion policy is provided.
+
+
+-- Admin-only part deletion. Existing movement/order history is protected.
+create or replace function public.admin_delete_part(p_part_id uuid) returns void
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare w uuid; p public.parts%rowtype;
+begin
+ w:=public.current_workshop_id();
+ if auth.uid() is null or w is null or not public.has_workshop_role(array['workshop_admin']::public.workshop_role[]) then raise exception 'Only a workshop administrator can delete parts'; end if;
+ select * into p from public.parts where id=p_part_id and workshop_id=w for update;
+ if not found then raise exception 'Part not found in this workshop'; end if;
+ if p.current_stock<>0 then raise exception 'Cannot delete a part with stock remaining. Use controlled adjustment first.'; end if;
+ if exists(select 1 from public.stock_movements where part_id=p.id) or exists(select 1 from public.purchase_orders where part_id=p.id) then raise exception 'Part has movement/order history and cannot be deleted.'; end if;
+ perform public.audit_event(w,'PART_DELETED',p.sku,p.sku,jsonb_build_object('part_id',p.id,'part_name',p.name));
+ delete from public.parts where id=p.id;
+end $$;
+revoke all on function public.admin_delete_part(uuid) from public,anon;
+grant execute on function public.admin_delete_part(uuid) to authenticated;
+
+
+-- Return technician accounts for the signed-in user's active workshop only.
+-- The UID is the canonical selectable technician code; manual codes remain allowed by the UI.
+create or replace function public.list_workshop_technicians()
+returns table(technician_code text, display_label text)
+language plpgsql stable security definer set search_path=public,pg_temp as $$
+declare w uuid;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  w := public.current_workshop_id();
+  if w is null then raise exception 'No active workshop membership'; end if;
+  return query
+    select m.user_id::text,
+           coalesce(nullif(trim(pr.display_name),''), nullif(trim(m.email),''), m.user_id::text)
+    from public.workshop_memberships m
+    left join public.profiles pr on pr.id=m.user_id
+    left join auth.users au on au.id=m.user_id
+    where m.workshop_id=w and m.active and m.role='technician'::public.workshop_role
+    order by coalesce(nullif(trim(pr.display_name),''), nullif(trim(au.email),''), m.user_id::text);
+end $$;
+revoke all on function public.list_workshop_technicians() from public, anon;
+grant execute on function public.list_workshop_technicians() to authenticated;
