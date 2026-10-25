@@ -59,3 +59,8 @@ In Supabase → Authentication → URL Configuration, set the Site URL to your p
 - **RLS errors:** do not disable RLS as a workaround. Review policies and membership records.
 
 GitHub Pages hosts only static frontend files. Supabase remains the database/auth backend. This project is not deployed until you complete these steps.
+
+
+## Existing database fixes (October 2026)
+
+If the admin delete button reports that `public.admin_delete_part(p_part_id)` is missing, open Supabase SQL Editor and run the contents of `SUPABASE_FIXES.sql`. This installs the function with workshop-admin-only permissions and asks Supabase to reload its schema cache. Do not rerun the entire schema on an existing database. The Receive Stock camera and Create New Part buttons are wired in `js/stock-movements.js`; deploy the updated project files to GitHub Pages and hard-refresh the website.
