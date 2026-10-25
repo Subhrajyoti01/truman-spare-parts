@@ -36,6 +36,13 @@
 
 In Supabase → Authentication → URL Configuration, set the Site URL to your published Pages URL and add that URL to the allowed redirect URLs. This is needed for password reset links and may be needed for email confirmation.
 
+### Password reset (important)
+The app now detects a password-recovery callback and displays a **Choose a new password** form instead of opening the inventory dashboard. The user must enter and confirm the new password and select **Save new password**; the app calls Supabase `auth.updateUser({ password })`, signs out, and returns to sign-in.
+
+For GitHub Pages, use the exact deployed URL. For example, if your repository is `truman-spare-parts` under `subhrajyoti01`, set Site URL to `https://subhrajyoti01.github.io/truman-spare-parts/` and add that same URL under **Redirect URLs**. Do not use `http://localhost:...`. If your repository name or username differs, use your actual published URL instead.
+
+To test: open the deployed website, enter the account email, click **Reset password**, open the newest email, and follow its link. The page should show **Choose a new password**. Save the new password, then sign in with it. If the link reports expired/invalid, request a fresh email and open the newest message. Make sure Supabase's recovery email template links through Supabase's verification URL and does not hard-code localhost.
+
 ## F. Verify persistence
 
 1. Sign in using a user with an active workshop membership.
@@ -60,7 +67,17 @@ In Supabase → Authentication → URL Configuration, set the Site URL to your p
 
 GitHub Pages hosts only static frontend files. Supabase remains the database/auth backend. This project is not deployed until you complete these steps.
 
+## Update: job-card approvals, closing, editing and role-based activity history
 
-## Existing database fixes (October 2026)
+For the updated job-card workflow, run `MIGRATION_JOB_CARD_ROLES.sql` in **Supabase Dashboard → SQL Editor → New query → Run**. Run it after the original `schema.sql`. It is designed as a migration and does not delete existing stock or job-card records.
 
-If the admin delete button reports that `public.admin_delete_part(p_part_id)` is missing, open Supabase SQL Editor and run the contents of `SUPABASE_FIXES.sql`. This installs the function with workshop-admin-only permissions and asks Supabase to reload its schema cache. Do not rerun the entire schema on an existing database. The Receive Stock camera and Create New Part buttons are wired in `js/stock-movements.js`; deploy the updated project files to GitHub Pages and hard-refresh the website.
+Then upload the updated frontend files from this ZIP to the existing GitHub repository, replacing the matching files and adding `MIGRATION_JOB_CARD_ROLES.sql` to the repository if you want to keep the migration documented. Commit the changes and wait for GitHub Pages to finish deploying. On the phone, refresh the site; if the old version remains, open it in Chrome and refresh again or clear the site cache.
+
+Workflow after update:
+- Admin and storekeeper can approve or reject pending provisional job cards and close open job cards.
+- Only the admin can edit rejected or closed job cards. Admin and storekeeper can edit other job cards.
+- Issue Parts only lists job cards with status `Open`; provisional cards must have been approved first.
+- Technician codes from the technician-list RPC and previously used codes appear as suggestions; users can type a code manually.
+- Admin and auditor can view all audit history. Storekeeper sees operational part/stock/job-card/order/exception events only. Other roles cannot open the audit page.
+
+**Important:** The database migration is the security enforcement. Hiding a page or button in the browser alone is not a security control. If your current Supabase project has custom policies or function definitions, review the SQL output for errors before testing the workflow.

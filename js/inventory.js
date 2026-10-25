@@ -28,7 +28,7 @@
    U.$$('[data-edit-part]').forEach(b=>b.onclick=()=>window.TrumanInventory.edit(rows.find(p=>p.id===b.dataset.editPart)));
    U.$$('[data-label-part]').forEach(b=>b.onclick=()=>window.TrumanBarcode.label(rows.find(p=>p.id===b.dataset.labelPart))); U.$$('[data-queue-part]').forEach(b=>b.onclick=()=>window.TrumanBarcode.queue(rows.find(p=>p.id===b.dataset.queuePart))); U.$$('[data-delete-part]').forEach(b=>b.onclick=async()=>{const p=rows.find(x=>x.id===b.dataset.deletePart);if(!U.confirm(`Delete ${p?.sku} — ${p?.name}?`))return;try{await U.call('admin_delete_part',{p_part_id:p.id});U.toast('Part deleted.','success');await window.TrumanInventory.render()}catch(e){U.toast(U.err(e),'error')}});
   },
-  edit:async (part,onSaved)=>{
+  edit:async part=>{
    const f=U.form(fields,part||{});
    if(part){f.elements.current_stock.disabled=true;f.elements.current_stock.title='Use stock receipt or adjustment workflow to change stock.';}
    f.onsubmit=async e=>{
@@ -38,7 +38,7 @@
     try{
      if(part){delete d.current_stock;const {error}=await window.sb.rpc('update_part_details',{p_part_id:part.id,p_sku:d.sku,p_name:d.name,p_description:d.description||null,p_category:d.category||null,p_unit_cost:d.unit_cost,p_bin_location:d.bin_location||null,p_supplier_name:d.supplier_name||null,p_supplier_contact:d.supplier_contact||null,p_avg_daily_demand:d.avg_daily_demand,p_lead_time_days:d.lead_time_days,p_safety_stock:d.safety_stock,p_abc_class:d.abc_class,p_xyz_class:d.xyz_class,p_minimum_order_qty:d.minimum_order_qty,p_target_stock_level:d.target_stock_level,p_manufacturer_reference:d.manufacturer_reference||null});if(error)throw error;U.toast('Part details updated.','success');}
      else{const {error}=await window.sb.rpc('create_part',{p_sku:d.sku,p_name:d.name,p_description:d.description||null,p_category:d.category||null,p_opening_stock:d.current_stock,p_unit_cost:d.unit_cost,p_bin_location:d.bin_location||null,p_supplier_name:d.supplier_name||null,p_supplier_contact:d.supplier_contact||null,p_avg_daily_demand:d.avg_daily_demand,p_lead_time_days:d.lead_time_days,p_safety_stock:d.safety_stock,p_abc_class:d.abc_class,p_xyz_class:d.xyz_class,p_minimum_order_qty:d.minimum_order_qty,p_target_stock_level:d.target_stock_level,p_manufacturer_reference:d.manufacturer_reference||null});if(error)throw error;U.toast('Part created.','success');}
-     U.$('#app-dialog').close();if(onSaved){await onSaved();}else{await window.TrumanInventory.render();}
+     U.$('#app-dialog').close();await window.TrumanInventory.render();
     }catch(e){U.$('#dynamic-message').textContent=U.err(e);}finally{b.disabled=false;}
    };
   }
